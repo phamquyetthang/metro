@@ -4,37 +4,22 @@
  * This source code is licensed under the MIT license found in the
  * LICENSE file in the root directory of this source tree.
  *
- * @flow strict-local
+ *
  * @format
  */
+"use strict";
 
-'use strict';
+const path = require("path");
 
-const path = require('path');
-
-import type Bundler from '../Bundler';
-import type {TransformOptions} from '../DeltaBundler/Worker';
-import type {TransformInputOptions} from '../DeltaBundler/types.flow';
-import type DeltaBundler, {TransformFn} from '../DeltaBundler';
-import type {ConfigT} from 'metro-config/src/configTypes.flow';
-import type {Type} from 'metro-transform-worker';
-
-type InlineRequiresRaw = {+blockList: {[string]: true, ...}, ...} | boolean;
-
-type TransformOptionsWithRawInlines = {|
-  ...TransformOptions,
-  +inlineRequires: InlineRequiresRaw,
-|};
-
-const baseIgnoredInlineRequires = ['React', 'react', 'react-native'];
+const baseIgnoredInlineRequires = ["React", "react", "react-native"];
 
 async function calcTransformerOptions(
-  entryFiles: $ReadOnlyArray<string>,
-  bundler: Bundler,
-  deltaBundler: DeltaBundler<>,
-  config: ConfigT,
-  options: TransformInputOptions,
-): Promise<TransformOptionsWithRawInlines> {
+  entryFiles,
+  bundler,
+  deltaBundler,
+  config,
+  options
+) {
   const baseOptions = {
     customTransformOptions: options.customTransformOptions,
     dev: options.dev,
@@ -44,42 +29,40 @@ async function calcTransformerOptions(
     minify: options.minify,
     platform: options.platform,
     runtimeBytecodeVersion: options.runtimeBytecodeVersion,
-    unstable_transformProfile: options.unstable_transformProfile,
-  };
-
-  // When we're processing scripts, we don't need to calculate any
+    unstable_transformProfile: options.unstable_transformProfile
+  }; // When we're processing scripts, we don't need to calculate any
   // inlineRequires information, since scripts by definition don't have
   // requires().
-  if (options.type === 'script') {
-    return {
-      ...baseOptions,
-      type: 'script',
-    };
+
+  if (options.type === "script") {
+    return { ...baseOptions, type: "script" };
   }
 
-  const getDependencies = async (path: string) => {
+  const getDependencies = async path => {
     const dependencies = await deltaBundler.getDependencies([path], {
       resolve: await getResolveDependencyFn(bundler, options.platform),
       transform: await getTransformFn([path], bundler, deltaBundler, config, {
         ...options,
-        minify: false,
+        minify: false
       }),
       transformOptions: options,
       onProgress: null,
       experimentalImportBundleSupport:
         config.transformer.experimentalImportBundleSupport,
-      shallow: false,
+      shallow: false
     });
-
     return Array.from(dependencies.keys());
   };
 
-  const {transform} = await config.transformer.getTransformOptions(
+  const { transform } = await config.transformer.getTransformOptions(
     entryFiles,
-    {dev: options.dev, hot: options.hot, platform: options.platform},
-    getDependencies,
+    {
+      dev: options.dev,
+      hot: options.hot,
+      platform: options.platform
+    },
+    getDependencies
   );
-
   return {
     ...baseOptions,
     inlineRequires: transform.inlineRequires || false,
@@ -88,15 +71,12 @@ async function calcTransformerOptions(
       transform.unstable_disableES6Transforms || false,
     nonInlinedRequires:
       transform.nonInlinedRequires || baseIgnoredInlineRequires,
-    type: 'module',
+    type: "module"
   };
 }
 
-function removeInlineRequiresBlockListFromOptions(
-  path: string,
-  inlineRequires: InlineRequiresRaw,
-): boolean {
-  if (typeof inlineRequires === 'object') {
+function removeInlineRequiresBlockListFromOptions(path, inlineRequires) {
+  if (typeof inlineRequires === "object") {
     return !(path in inlineRequires.blockList);
   }
 
@@ -104,60 +84,52 @@ function removeInlineRequiresBlockListFromOptions(
 }
 
 async function getTransformFn(
-  entryFiles: $ReadOnlyArray<string>,
-  bundler: Bundler,
-  deltaBundler: DeltaBundler<>,
-  config: ConfigT,
-  options: TransformInputOptions,
-): Promise<TransformFn<>> {
-  const {inlineRequires, ...transformOptions} = await calcTransformerOptions(
+  entryFiles,
+  bundler,
+  deltaBundler,
+  config,
+  options
+) {
+  const { inlineRequires, ...transformOptions } = await calcTransformerOptions(
     entryFiles,
     bundler,
     deltaBundler,
     config,
-    options,
+    options
   );
-
-  return async (path: string) => {
+  return async path => {
     return await bundler.transformFile(path, {
       ...transformOptions,
       type: getType(transformOptions.type, path, config.resolver.assetExts),
       inlineRequires: removeInlineRequiresBlockListFromOptions(
         path,
-        inlineRequires,
-      ),
+        inlineRequires
+      )
     });
   };
 }
 
-function getType(
-  type: string,
-  filePath: string,
-  assetExts: $ReadOnlyArray<string>,
-): Type {
-  if (type === 'script') {
+function getType(type, filePath, assetExts) {
+  if (type === "script") {
     return type;
   }
 
   if (assetExts.indexOf(path.extname(filePath).slice(1)) !== -1) {
-    return 'asset';
+    return "asset";
   }
 
-  return 'module';
+  return "module";
 }
 
-async function getResolveDependencyFn(
-  bundler: Bundler,
-  platform: ?string,
-): Promise<(from: string, to: string) => string> {
+async function getResolveDependencyFn(bundler, platform) {
   const dependencyGraph = await await bundler.getDependencyGraph();
-
-  return (from: string, to: string) =>
-    // $FlowFixMe[incompatible-call]
-    dependencyGraph.resolveDependency(from, to, platform);
+  return (
+    from,
+    to // $FlowFixMe[incompatible-call]
+  ) => dependencyGraph.resolveDependency(from, to, platform);
 }
 
 module.exports = {
   getTransformFn,
-  getResolveDependencyFn,
+  getResolveDependencyFn
 };

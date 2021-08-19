@@ -4,30 +4,18 @@
  * This source code is licensed under the MIT license found in the
  * LICENSE file in the root directory of this source tree.
  *
- * @flow strict-local
+ *
  * @format
  */
+"use strict";
 
-'use strict';
-
-const canonicalize = require('metro-core/src/canonicalize');
-
-import type {TransformInputOptions} from '../DeltaBundler/types.flow';
-
-export opaque type GraphId: string = string;
+const canonicalize = require("metro-core/src/canonicalize");
 
 function getGraphId(
-  entryFile: string,
-  options: TransformInputOptions,
-  {
-    shallow,
-    experimentalImportBundleSupport,
-  }: {
-    +shallow: boolean,
-    +experimentalImportBundleSupport: boolean,
-    ...
-  },
-): GraphId {
+  entryFile,
+  options,
+  { shallow, experimentalImportBundleSupport }
+) {
   return JSON.stringify(
     {
       entryFile,
@@ -47,10 +35,10 @@ function getGraphId(
         experimentalImportBundleSupport,
         shallow,
         unstable_transformProfile:
-          options.unstable_transformProfile || 'default',
-      },
+          options.unstable_transformProfile || "default"
+      }
     },
-    canonicalize,
+    canonicalize
   );
 }
 

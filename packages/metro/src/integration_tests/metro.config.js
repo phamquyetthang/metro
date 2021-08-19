@@ -7,37 +7,42 @@
  * @emails oncall+metro_bundler
  * @format
  */
+"use strict";
 
-'use strict';
+const path = require("path");
 
-const path = require('path');
-
-const ROOT_PATH = path.resolve(__dirname, 'basic_bundle');
-
+const ROOT_PATH = path.resolve(__dirname, "basic_bundle");
 module.exports = {
   cacheStores: [],
   maxWorkers: 1,
   projectRoot: ROOT_PATH,
-  reporter: {update() {}},
-  watchFolders: [path.resolve(__dirname, '../../../')],
-  server: {port: 10028},
+  reporter: {
+    update() {}
+  },
+  watchFolders: [path.resolve(__dirname, "../../../")],
+  server: {
+    port: 10028
+  },
   resolver: {
-    useWatchman: false,
+    useWatchman: false
   },
   transformer: {
-    assetRegistryPath: path.join(ROOT_PATH, 'AssetRegistry'),
+    assetRegistryPath: path.join(ROOT_PATH, "AssetRegistry"),
     asyncRequireModulePath: require.resolve(
-      'metro-runtime/src/modules/asyncRequire',
+      "metro-runtime/src/modules/asyncRequire"
     ),
     babelTransformerPath: require.resolve(
-      'metro-react-native-babel-transformer',
+      "metro-react-native-babel-transformer"
     ),
     enableBabelRCLookup: false,
     enableBabelRuntime: false,
     getTransformOptions: async () => ({
-      transform: {experimentalImportSupport: true, inlineRequires: false},
+      transform: {
+        experimentalImportSupport: true,
+        inlineRequires: false
+      },
       preloadedModules: false,
-      ramGroups: [],
-    }),
-  },
+      ramGroups: []
+    })
+  }
 };

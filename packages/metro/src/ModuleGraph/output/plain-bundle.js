@@ -4,19 +4,16 @@
  * This source code is licensed under the MIT license found in the
  * LICENSE file in the root directory of this source tree.
  *
- * @flow
+ *
  * @format
  */
+"use strict";
 
-'use strict';
+const meta = require("../../shared/output/meta");
 
-const meta = require('../../shared/output/meta');
+const { getModuleCodeAndMap, concat } = require("./util");
 
-const {getModuleCodeAndMap, concat} = require('./util');
-const {BundleBuilder} = require('metro-source-map');
-
-import type {OutputFn} from '../types.flow';
-import type {MixedSourceMap} from 'metro-source-map';
+const { BundleBuilder } = require("metro-source-map");
 
 function asPlainBundle({
   dependencyMapReservedName,
@@ -26,23 +23,23 @@ function asPlainBundle({
   modules,
   requireCalls,
   sourceMapPath,
-  enableIDInlining,
-}): {|
-  code: string | Buffer,
-  extraFiles?: Iterable<[string, string | Buffer]>,
-  map: MixedSourceMap,
-|} {
+  enableIDInlining
+}) {
   const builder = new BundleBuilder(filename);
-  const modIdForPath = (x: {path: string, ...}) => idsForPath(x).moduleId;
+
+  const modIdForPath = x => idsForPath(x).moduleId;
 
   for (const module of concat(modules, requireCalls)) {
-    const {moduleCode, moduleMap} = getModuleCodeAndMap(module, modIdForPath, {
-      dependencyMapReservedName,
-      enableIDInlining,
-      globalPrefix,
-    });
-
-    builder.append(moduleCode + '\n', moduleMap);
+    const { moduleCode, moduleMap } = getModuleCodeAndMap(
+      module,
+      modIdForPath,
+      {
+        dependencyMapReservedName,
+        enableIDInlining,
+        globalPrefix
+      }
+    );
+    builder.append(moduleCode + "\n", moduleMap);
   }
 
   if (sourceMapPath) {
@@ -54,8 +51,8 @@ function asPlainBundle({
   return {
     code,
     extraFiles: [[`${filename}.meta`, meta(code)]],
-    map,
+    map
   };
 }
 
-module.exports = (asPlainBundle: OutputFn<>);
+module.exports = asPlainBundle;

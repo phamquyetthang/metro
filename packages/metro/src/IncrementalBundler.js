@@ -4,273 +4,229 @@
  * This source code is licensed under the MIT license found in the
  * LICENSE file in the root directory of this source tree.
  *
- * @flow
+ *
  * @format
  */
+"use strict";
 
-'use strict';
+const Bundler = require("./Bundler");
 
-const Bundler = require('./Bundler');
-const DeltaBundler = require('./DeltaBundler');
-const ResourceNotFoundError = require('./IncrementalBundler/ResourceNotFoundError');
+const DeltaBundler = require("./DeltaBundler");
 
-const crypto = require('crypto');
-const fs = require('fs');
-const getGraphId = require('./lib/getGraphId');
-const getPrependedScripts = require('./lib/getPrependedScripts');
-const path = require('path');
-const transformHelpers = require('./lib/transformHelpers');
+const ResourceNotFoundError = require("./IncrementalBundler/ResourceNotFoundError");
 
-import type {
-  Options as DeltaBundlerOptions,
-  TransformInputOptions,
-  Dependencies,
-} from './DeltaBundler/types.flow';
-import type {DeltaResult, Module, Graph} from './DeltaBundler';
-import type {GraphId} from './lib/getGraphId';
-import type {ConfigT} from 'metro-config/src/configTypes.flow';
+const crypto = require("crypto");
 
-export opaque type RevisionId: string = string;
+const fs = require("fs");
 
-export type OutputGraph = Graph<>;
+const getGraphId = require("./lib/getGraphId");
 
-type OtherOptions = {|
-  +onProgress: $PropertyType<DeltaBundlerOptions<>, 'onProgress'>,
-  +shallow: boolean,
-|};
+const getPrependedScripts = require("./lib/getPrependedScripts");
 
-export type GraphRevision = {|
-  // Identifies the last computed revision.
-  +id: RevisionId,
-  +date: Date,
-  +graphId: GraphId,
-  +graph: OutputGraph,
-  +prepend: $ReadOnlyArray<Module<>>,
-|};
+const path = require("path");
 
-export type IncrementalBundlerOptions = $ReadOnly<{|
-  hasReducedPerformance?: boolean,
-  watch?: boolean,
-|}>;
+const transformHelpers = require("./lib/transformHelpers");
 
-function createRevisionId(): RevisionId {
-  return crypto.randomBytes(8).toString('hex');
+function createRevisionId() {
+  return crypto.randomBytes(8).toString("hex");
 }
 
-function revisionIdFromString(str: string): RevisionId {
+function revisionIdFromString(str) {
   return str;
 }
 
 class IncrementalBundler {
-  _config: ConfigT;
-  _bundler: Bundler;
-  _deltaBundler: DeltaBundler<>;
-  _revisionsById: Map<RevisionId, Promise<GraphRevision>> = new Map();
-  _revisionsByGraphId: Map<GraphId, Promise<GraphRevision>> = new Map();
+  _revisionsById = new Map();
+  _revisionsByGraphId = new Map();
+  static revisionIdFromString = revisionIdFromString;
 
-  static revisionIdFromString: (
-    str: string,
-  ) => RevisionId = revisionIdFromString;
-
-  constructor(config: ConfigT, options?: IncrementalBundlerOptions) {
+  constructor(config, options) {
     this._config = config;
     this._bundler = new Bundler(config, options);
     this._deltaBundler = new DeltaBundler(this._bundler);
   }
 
-  end(): void {
+  end() {
     this._deltaBundler.end();
+
     this._bundler.end();
   }
 
-  getBundler(): Bundler {
+  getBundler() {
     return this._bundler;
   }
 
-  getDeltaBundler(): DeltaBundler<> {
+  getDeltaBundler() {
     return this._deltaBundler;
   }
 
-  getRevision(revisionId: RevisionId): ?Promise<GraphRevision> {
+  getRevision(revisionId) {
     return this._revisionsById.get(revisionId);
   }
 
-  getRevisionByGraphId(graphId: GraphId): ?Promise<GraphRevision> {
+  getRevisionByGraphId(graphId) {
     return this._revisionsByGraphId.get(graphId);
   }
 
   async buildGraphForEntries(
-    entryFiles: $ReadOnlyArray<string>,
-    transformOptions: TransformInputOptions,
-    otherOptions?: OtherOptions = {
+    entryFiles,
+    transformOptions,
+    otherOptions = {
       onProgress: null,
-      shallow: false,
-    },
-  ): Promise<OutputGraph> {
+      shallow: false
+    }
+  ) {
     const absoluteEntryFiles = await this._getAbsoluteEntryFiles(entryFiles);
-
     const graph = await this._deltaBundler.buildGraph(absoluteEntryFiles, {
       resolve: await transformHelpers.getResolveDependencyFn(
         this._bundler,
-        transformOptions.platform,
+        transformOptions.platform
       ),
       transform: await transformHelpers.getTransformFn(
         absoluteEntryFiles,
         this._bundler,
         this._deltaBundler,
         this._config,
-        transformOptions,
+        transformOptions
       ),
       transformOptions,
       onProgress: otherOptions.onProgress,
       experimentalImportBundleSupport: this._config.transformer
         .experimentalImportBundleSupport,
-      shallow: otherOptions.shallow,
+      shallow: otherOptions.shallow
     });
 
     this._config.serializer.experimentalSerializerHook(graph, {
       added: graph.dependencies,
       modified: new Map(),
       deleted: new Set(),
-      reset: true,
+      reset: true
     });
 
     return graph;
   }
 
   async getDependencies(
-    entryFiles: $ReadOnlyArray<string>,
-    transformOptions: TransformInputOptions,
-    otherOptions?: OtherOptions = {
+    entryFiles,
+    transformOptions,
+    otherOptions = {
       onProgress: null,
-      shallow: false,
-    },
-  ): Promise<Dependencies<>> {
+      shallow: false
+    }
+  ) {
     const absoluteEntryFiles = await this._getAbsoluteEntryFiles(entryFiles);
-
     const dependencies = await this._deltaBundler.getDependencies(
       absoluteEntryFiles,
       {
         resolve: await transformHelpers.getResolveDependencyFn(
           this._bundler,
-          transformOptions.platform,
+          transformOptions.platform
         ),
         transform: await transformHelpers.getTransformFn(
           absoluteEntryFiles,
           this._bundler,
           this._deltaBundler,
           this._config,
-          transformOptions,
+          transformOptions
         ),
         transformOptions,
         onProgress: otherOptions.onProgress,
         experimentalImportBundleSupport: this._config.transformer
           .experimentalImportBundleSupport,
-        shallow: otherOptions.shallow,
-      },
+        shallow: otherOptions.shallow
+      }
     );
-
     return dependencies;
   }
 
   async buildGraph(
-    entryFile: string,
-    transformOptions: TransformInputOptions,
-    otherOptions?: OtherOptions = {
+    entryFile,
+    transformOptions,
+    otherOptions = {
       onProgress: null,
-      shallow: false,
-    },
-  ): Promise<{|+graph: OutputGraph, +prepend: $ReadOnlyArray<Module<>>|}> {
+      shallow: false
+    }
+  ) {
     const graph = await this.buildGraphForEntries(
       [entryFile],
       transformOptions,
-      otherOptions,
+      otherOptions
     );
-
-    const {type: _, ...transformOptionsWithoutType} = transformOptions;
-
+    const { type: _, ...transformOptionsWithoutType } = transformOptions;
     const prepend = await getPrependedScripts(
       this._config,
       transformOptionsWithoutType,
       this._bundler,
-      this._deltaBundler,
+      this._deltaBundler
     );
-
     return {
       prepend,
-      graph,
+      graph
     };
-  }
-
-  // TODO T34760750 (alexkirsz) Eventually, I'd like to get to a point where
+  } // TODO T34760750 (alexkirsz) Eventually, I'd like to get to a point where
   // this class exposes only initializeGraph and updateGraph.
+
   async initializeGraph(
-    entryFile: string,
-    transformOptions: TransformInputOptions,
-    otherOptions?: OtherOptions = {
+    entryFile,
+    transformOptions,
+    otherOptions = {
       onProgress: null,
-      shallow: false,
-    },
-  ): Promise<{
-    delta: DeltaResult<>,
-    revision: GraphRevision,
-    ...
-  }> {
+      shallow: false
+    }
+  ) {
     const graphId = getGraphId(entryFile, transformOptions, {
       shallow: otherOptions.shallow,
       experimentalImportBundleSupport: this._config.transformer
-        .experimentalImportBundleSupport,
+        .experimentalImportBundleSupport
     });
     const revisionId = createRevisionId();
+
     const revisionPromise = (async () => {
-      const {graph, prepend} = await this.buildGraph(
+      const { graph, prepend } = await this.buildGraph(
         entryFile,
         transformOptions,
-        otherOptions,
+        otherOptions
       );
       return {
         id: revisionId,
         date: new Date(),
         graphId,
         graph,
-        prepend,
+        prepend
       };
     })();
 
     this._revisionsById.set(revisionId, revisionPromise);
+
     this._revisionsByGraphId.set(graphId, revisionPromise);
+
     try {
       const revision = await revisionPromise;
       const delta = {
         added: revision.graph.dependencies,
         modified: new Map(),
         deleted: new Set(),
-        reset: true,
+        reset: true
       };
       return {
         revision,
-        delta,
+        delta
       };
     } catch (err) {
       // Evict a bad revision from the cache since otherwise
       // we'll keep getting it even after the build is fixed.
       this._revisionsById.delete(revisionId);
+
       this._revisionsByGraphId.delete(graphId);
+
       throw err;
     }
   }
 
-  async updateGraph(
-    revision: GraphRevision,
-    reset: boolean,
-  ): Promise<{
-    delta: DeltaResult<>,
-    revision: GraphRevision,
-    ...
-  }> {
+  async updateGraph(revision, reset) {
     const delta = await this._deltaBundler.getDelta(revision.graph, {
       reset,
-      shallow: false,
+      shallow: false
     });
 
     this._config.serializer.experimentalSerializerHook(revision.graph, delta);
@@ -281,43 +237,51 @@ class IncrementalBundler {
       delta.deleted.size > 0
     ) {
       this._revisionsById.delete(revision.id);
+
       revision = {
         ...revision,
         // Generate a new revision id, to be used to verify the next incremental
         // request.
-        id: crypto.randomBytes(8).toString('hex'),
-        date: new Date(),
+        id: crypto.randomBytes(8).toString("hex"),
+        date: new Date()
       };
       const revisionPromise = Promise.resolve(revision);
+
       this._revisionsById.set(revision.id, revisionPromise);
+
       this._revisionsByGraphId.set(revision.graphId, revisionPromise);
     }
 
-    return {revision, delta};
+    return {
+      revision,
+      delta
+    };
   }
 
-  async endGraph(graphId: GraphId): Promise<void> {
+  async endGraph(graphId) {
     const revPromise = this._revisionsByGraphId.get(graphId);
+
     if (!revPromise) {
       return;
     }
+
     const revision = await revPromise;
+
     this._deltaBundler.endGraph(revision.graph);
+
     this._revisionsByGraphId.delete(graphId);
+
     this._revisionsById.delete(revision.id);
   }
 
-  async _getAbsoluteEntryFiles(
-    entryFiles: $ReadOnlyArray<string>,
-  ): Promise<$ReadOnlyArray<string>> {
-    const absoluteEntryFiles = entryFiles.map((entryFile: string) =>
-      path.resolve(this._config.projectRoot, entryFile),
+  async _getAbsoluteEntryFiles(entryFiles) {
+    const absoluteEntryFiles = entryFiles.map(entryFile =>
+      path.resolve(this._config.projectRoot, entryFile)
     );
-
     await Promise.all(
       absoluteEntryFiles.map(
-        (entryFile: string) =>
-          new Promise((resolve: void => void, reject: mixed => mixed) => {
+        entryFile =>
+          new Promise((resolve, reject) => {
             // This should throw an error if the file doesn't exist.
             // Using this instead of fs.exists to account for SimLinks.
             fs.realpath(entryFile, err => {
@@ -327,10 +291,9 @@ class IncrementalBundler {
                 resolve();
               }
             });
-          }),
-      ),
+          })
+      )
     );
-
     return absoluteEntryFiles;
   }
 }

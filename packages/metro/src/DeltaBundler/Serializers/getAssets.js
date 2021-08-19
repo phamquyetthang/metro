@@ -4,41 +4,27 @@
  * This source code is licensed under the MIT license found in the
  * LICENSE file in the root directory of this source tree.
  *
- * @flow strict-local
+ *
  * @format
  */
+"use strict";
 
-'use strict';
+const path = require("path");
 
-const path = require('path');
+const { getAssetData } = require("../../Assets");
 
-const {getAssetData} = require('../../Assets');
-const {getJsOutput, isJsModule} = require('./helpers/js');
+const { getJsOutput, isJsModule } = require("./helpers/js");
 
-import type {AssetData} from '../../Assets';
-import type {Dependencies, Module} from '../types.flow';
-
-type Options = {|
-  +processModuleFilter: (module: Module<>) => boolean,
-  assetPlugins: $ReadOnlyArray<string>,
-  platform: ?string,
-  projectRoot: string,
-  publicPath: string,
-|};
-
-async function getAssets(
-  dependencies: Dependencies<>,
-  options: Options,
-): Promise<$ReadOnlyArray<AssetData>> {
+async function getAssets(dependencies, options) {
   const promises = [];
-  const {processModuleFilter} = options;
+  const { processModuleFilter } = options;
 
   for (const module of dependencies.values()) {
     if (
       isJsModule(module) &&
       processModuleFilter(module) &&
-      getJsOutput(module).type === 'js/module/asset' &&
-      path.relative(options.projectRoot, module.path) !== 'package.json'
+      getJsOutput(module).type === "js/module/asset" &&
+      path.relative(options.projectRoot, module.path) !== "package.json"
     ) {
       promises.push(
         getAssetData(
@@ -46,8 +32,8 @@ async function getAssets(
           path.relative(options.projectRoot, module.path),
           options.assetPlugins,
           options.platform,
-          options.publicPath,
-        ),
+          options.publicPath
+        )
       );
     }
   }

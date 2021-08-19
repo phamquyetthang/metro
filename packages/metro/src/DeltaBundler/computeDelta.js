@@ -4,18 +4,12 @@
  * This source code is licensed under the MIT license found in the
  * LICENSE file in the root directory of this source tree.
  *
- * @flow strict-local
+ *
  * @format
  */
+"use strict";
 
-'use strict';
-
-import type {
-  ModuleMap,
-  DeltaBundle,
-} from 'metro-runtime/src/modules/types.flow';
-
-function computeDelta(entries1: ModuleMap, entries2: ModuleMap): DeltaBundle {
+function computeDelta(entries1, entries2) {
   const modules1 = new Map(entries1);
   const modules2 = new Map(entries2);
   const added = new Map();
@@ -24,6 +18,7 @@ function computeDelta(entries1: ModuleMap, entries2: ModuleMap): DeltaBundle {
 
   for (const [id, code] of modules1.entries()) {
     const newCode = modules2.get(id);
+
     if (newCode == null) {
       deleted.add(id);
     } else if (newCode !== code) {
@@ -40,7 +35,7 @@ function computeDelta(entries1: ModuleMap, entries2: ModuleMap): DeltaBundle {
   return {
     added: [...added.entries()],
     modified: [...modified.entries()],
-    deleted: [...deleted],
+    deleted: [...deleted]
   };
 }
 

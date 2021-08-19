@@ -4,110 +4,89 @@
  * This source code is licensed under the MIT license found in the
  * LICENSE file in the root directory of this source tree.
  *
- * @flow strict-local
+ *
  * @format
  */
+"use strict";
 
-'use strict';
+const countLines = require("./countLines");
 
-const countLines = require('./countLines');
-const defaults = require('metro-config/src/defaults/defaults');
-const getPreludeCode = require('./getPreludeCode');
-const transformHelpers = require('./transformHelpers');
+const defaults = require("metro-config/src/defaults/defaults");
 
-const {compile} = require('metro-hermes-compiler');
+const getPreludeCode = require("./getPreludeCode");
 
-import type Bundler from '../Bundler';
-import type {TransformInputOptions} from '../DeltaBundler/types.flow';
-import type DeltaBundler, {Module} from '../DeltaBundler';
-import type {ConfigT} from 'metro-config/src/configTypes.flow';
+const transformHelpers = require("./transformHelpers");
 
-async function getPrependedScripts(
-  config: ConfigT,
-  options: $Diff<
-    TransformInputOptions,
-    {type: $PropertyType<TransformInputOptions, 'type'>, ...},
-  >,
-  bundler: Bundler,
-  deltaBundler: DeltaBundler<>,
-): Promise<$ReadOnlyArray<Module<>>> {
+const { compile } = require("metro-hermes-compiler");
+
+async function getPrependedScripts(config, options, bundler, deltaBundler) {
   // Get all the polyfills from the relevant option params (the
   // `getPolyfills()` method and the `polyfillModuleNames` variable).
   const polyfillModuleNames = config.serializer
     .getPolyfills({
-      platform: options.platform,
+      platform: options.platform
     })
     .concat(config.serializer.polyfillModuleNames);
-
-  const transformOptions: TransformInputOptions = {
-    ...options,
-    type: 'script',
-  };
-
+  const transformOptions = { ...options, type: "script" };
   const dependencies = await deltaBundler.getDependencies(
     [defaults.moduleSystem, ...polyfillModuleNames],
     {
       resolve: await transformHelpers.getResolveDependencyFn(
         bundler,
-        options.platform,
+        options.platform
       ),
       transform: await transformHelpers.getTransformFn(
         [defaults.moduleSystem, ...polyfillModuleNames],
         bundler,
         deltaBundler,
         config,
-        transformOptions,
+        transformOptions
       ),
       transformOptions,
       onProgress: null,
       experimentalImportBundleSupport:
         config.transformer.experimentalImportBundleSupport,
-      shallow: false,
-    },
+      shallow: false
+    }
   );
-
   return [
     _getPrelude({
       dev: options.dev,
-      globalPrefix: config.transformer.globalPrefix,
+      globalPrefix: config.transformer.globalPrefix
     }),
-    ...dependencies.values(),
+    ...dependencies.values()
   ];
 }
 
-function _getPrelude({
-  dev,
-  globalPrefix,
-}: {
-  dev: boolean,
-  globalPrefix: string,
-  ...
-}): Module<> {
-  const code = getPreludeCode({isDev: dev, globalPrefix});
-  const name = '__prelude__';
-
+function _getPrelude({ dev, globalPrefix }) {
+  const code = getPreludeCode({
+    isDev: dev,
+    globalPrefix
+  });
+  const name = "__prelude__";
   return {
     dependencies: new Map(),
-    getSource: (): Buffer => Buffer.from(code),
+    getSource: () => Buffer.from(code),
     inverseDependencies: new Set(),
     path: name,
     output: [
       {
-        type: 'js/script/virtual',
+        type: "js/script/virtual",
         data: {
           code,
           lineCount: countLines(code),
-          map: [],
-        },
+          map: []
+        }
       },
       {
-        type: 'bytecode/script/virtual',
+        type: "bytecode/script/virtual",
         data: {
-          bytecode: compile(code, {sourceURL: '__prelude__.virtual.js'})
-            .bytecode,
-        },
-      },
-    ],
+          bytecode: compile(code, {
+            sourceURL: "__prelude__.virtual.js"
+          }).bytecode
+        }
+      }
+    ]
   };
 }
 

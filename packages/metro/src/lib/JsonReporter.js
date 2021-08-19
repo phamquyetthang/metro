@@ -4,35 +4,32 @@
  * This source code is licensed under the MIT license found in the
  * LICENSE file in the root directory of this source tree.
  *
- * @flow
+ *
  * @format
  */
+"use strict";
 
-'use strict';
+const { Writable } = require("stream");
 
-const {Writable} = require('stream');
-
-class JsonReporter<TEvent: {[string]: any, ...}> {
-  _stream: Writable;
-
-  constructor(stream: Writable) {
+class JsonReporter {
+  constructor(stream) {
     this._stream = stream;
   }
-
   /**
    * There is a special case for errors because they have non-enumerable fields.
    * (Perhaps we should switch in favor of plain object?)
    */
-  update(event: TEvent): void {
+
+  update(event) {
     // $FlowFixMe[method-unbinding] added when improving typing for this parameters
-    if (Object.prototype.toString.call(event.error) === '[object Error]') {
+    if (Object.prototype.toString.call(event.error) === "[object Error]") {
       event = Object.assign(event, {
         message: event.error.message,
-        stack: event.error.stack,
+        stack: event.error.stack
       });
     }
 
-    this._stream.write(JSON.stringify(event) + '\n');
+    this._stream.write(JSON.stringify(event) + "\n");
   }
 }
 

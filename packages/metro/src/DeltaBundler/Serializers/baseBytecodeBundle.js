@@ -4,32 +4,20 @@
  * This source code is licensed under the MIT license found in the
  * LICENSE file in the root directory of this source tree.
  *
- * @flow
+ *
  * @format
  */
+"use strict";
 
-'use strict';
+const getAppendScripts = require("../../lib/getAppendScripts");
 
-const getAppendScripts = require('../../lib/getAppendScripts');
-const processBytecodeModules = require('./helpers/processBytecodeModules');
+const processBytecodeModules = require("./helpers/processBytecodeModules");
 
-const {getJsOutput} = require('./helpers/js');
-const {compile} = require('metro-hermes-compiler');
+const { getJsOutput } = require("./helpers/js");
 
-import type {
-  Graph,
-  MixedOutput,
-  Module,
-  SerializerOptions,
-} from '../types.flow';
-import type {BytecodeBundle} from 'metro-runtime/src/modules/types.flow';
+const { compile } = require("metro-hermes-compiler");
 
-function baseBytecodeBundle(
-  entryPoint: string,
-  preModules: $ReadOnlyArray<Module<>>,
-  graph: Graph<>,
-  options: SerializerOptions,
-): BytecodeBundle {
+function baseBytecodeBundle(entryPoint, preModules, graph, options) {
   for (const module of graph.dependencies.values()) {
     options.createModuleId(module.path);
   }
@@ -38,19 +26,16 @@ function baseBytecodeBundle(
     filter: options.processModuleFilter,
     createModuleId: options.createModuleId,
     dev: options.dev,
-    projectRoot: options.projectRoot,
-  };
+    projectRoot: options.projectRoot
+  }; // Do not prepend polyfills or the require runtime when only modules are requested
 
-  // Do not prepend polyfills or the require runtime when only modules are requested
   if (options.modulesOnly) {
     preModules = [];
   }
 
   const modules = [...graph.dependencies.values()].sort(
-    (a: Module<MixedOutput>, b: Module<MixedOutput>) =>
-      options.createModuleId(a.path) - options.createModuleId(b.path),
+    (a, b) => options.createModuleId(a.path) - options.createModuleId(b.path)
   );
-
   const post = processBytecodeModules(
     getAppendScripts(
       entryPoint,
@@ -65,41 +50,39 @@ function baseBytecodeBundle(
         runBeforeMainModule: options.runBeforeMainModule,
         runModule: options.runModule,
         sourceMapUrl: options.sourceMapUrl,
-        sourceUrl: options.sourceUrl,
-      },
+        sourceUrl: options.sourceUrl
+      }
     ).map(module => {
       return {
         ...module,
         output: [
           ...module.output,
           {
-            type: 'bytecode/script/virtual',
+            type: "bytecode/script/virtual",
             data: {
               bytecode: compile(getJsOutput(module).data.code, {
-                sourceURL: module.path,
-              }).bytecode,
-            },
-          },
-        ],
+                sourceURL: module.path
+              }).bytecode
+            }
+          }
+        ]
       };
     }),
-    processModulesOptions,
+    processModulesOptions
   ).flatMap(([module, bytecodeBundle]) => bytecodeBundle);
-
   const processedModules = processBytecodeModules(
     [...graph.dependencies.values()],
-    processModulesOptions,
+    processModulesOptions
   ).map(([module, bytecodeBundle]) => [
     options.createModuleId(module.path),
-    bytecodeBundle,
+    bytecodeBundle
   ]);
-
   return {
     pre: processBytecodeModules(preModules, processModulesOptions).flatMap(
-      ([_, bytecodeBundle]) => bytecodeBundle,
+      ([_, bytecodeBundle]) => bytecodeBundle
     ),
     post,
-    modules: processedModules,
+    modules: processedModules
   };
 }
 

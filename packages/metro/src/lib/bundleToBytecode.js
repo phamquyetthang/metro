@@ -4,18 +4,12 @@
  * This source code is licensed under the MIT license found in the
  * LICENSE file in the root directory of this source tree.
  *
- * @flow strict-local
+ *
  * @format
  */
+"use strict";
 
-'use strict';
-
-const {getFileLength} = require('metro-hermes-compiler');
-
-import type {
-  BytecodeBundle,
-  BundleMetadata,
-} from 'metro-runtime/src/modules/types.flow';
+const { getFileLength } = require("metro-hermes-compiler");
 
 // The magic number is used as a header for bytecode.
 // It represents a Metro tunnel in binary.
@@ -26,20 +20,19 @@ import type {
 // 11000011
 const MAGIC_NUMBER = 0xffe7c3c3;
 
-function getFileHeader(moduleCount: number): Buffer {
+function getFileHeader(moduleCount) {
   const buffer = Buffer.alloc(8);
   buffer.writeUInt32LE(MAGIC_NUMBER, 0);
   buffer.writeUInt32LE(moduleCount, 4);
   return buffer;
 }
 
-function addModuleHeader(buffer: Buffer): [Buffer, Buffer] {
+function addModuleHeader(buffer) {
   const fileLength = getFileLength(buffer, 0);
   const header = Buffer.alloc(4);
   header.writeUInt32LE(fileLength, 0);
   return [header, buffer];
 }
-
 /**
  * A bytecode bundle has the following format:
  *
@@ -49,9 +42,8 @@ function addModuleHeader(buffer: Buffer): [Buffer, Buffer] {
  * ...
  *
  */
-function bundleToBytecode(
-  bundle: BytecodeBundle,
-): {|+bytecode: Buffer, +metadata: BundleMetadata|} {
+
+function bundleToBytecode(bundle) {
   const buffers = [];
 
   if (bundle.pre.length) {
@@ -59,18 +51,16 @@ function bundleToBytecode(
   }
 
   const modules = [];
-
   const sortedModules = bundle.modules
-    .slice()
-    // In a JS bundle, the order of modules needs to be deterministic for source
+    .slice() // In a JS bundle, the order of modules needs to be deterministic for source
     // maps to work. This constraint is not necessary for bytecode bundles but
     // is kept for consistency.
     .sort((a, b) => a[0] - b[0]);
 
   for (const [id, bytecodeBundle] of sortedModules) {
-    buffers.push(...bytecodeBundle);
-    // Use the size of the last item in `bytecodeBundle` which is always
+    buffers.push(...bytecodeBundle); // Use the size of the last item in `bytecodeBundle` which is always
     // the actual module without headers.
+
     modules.push([id, bytecodeBundle[bytecodeBundle.length - 1].length]);
   }
 
@@ -81,13 +71,13 @@ function bundleToBytecode(
   return {
     bytecode: Buffer.concat([
       getFileHeader(buffers.length),
-      ...buffers.flatMap(addModuleHeader),
+      ...buffers.flatMap(addModuleHeader)
     ]),
     metadata: {
       pre: bundle.pre ? bundle.pre.length : 0,
       post: bundle.post.length,
-      modules,
-    },
+      modules
+    }
   };
 }
 

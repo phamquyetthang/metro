@@ -4,74 +4,83 @@
  * This source code is licensed under the MIT license found in the
  * LICENSE file in the root directory of this source tree.
  *
- * @flow
+ *
  * @format
  */
+"use strict";
 
-'use strict';
+const MetroApi = require("../index");
 
-const MetroApi = require('../index');
+const { watchFile, makeAsyncCommand } = require("../cli-utils");
 
-const {watchFile, makeAsyncCommand} = require('../cli-utils');
-const {loadConfig, resolveConfig} = require('metro-config');
-const {promisify} = require('util');
+const { loadConfig, resolveConfig } = require("metro-config");
 
-import type {RunServerOptions} from '../index';
-import type {YargArguments} from 'metro-config/src/configTypes.flow';
-import typeof Yargs from 'yargs';
+const { promisify } = require("util");
 
-module.exports = (): ({|
+module.exports = () => ({
+  command: "serve",
+  description: "Starts Metro on the given port, building bundles on the fly",
   // $FlowFixMe[value-as-type]
-  builder: (yargs: Yargs) => void,
-  command: $TEMPORARY$string<'serve'>,
-  description: string,
-  handler: (argv: YargArguments) => void,
-|}) => ({
-  command: 'serve',
-
-  description: 'Starts Metro on the given port, building bundles on the fly',
-
-  // $FlowFixMe[value-as-type]
-  builder: (yargs: Yargs): void => {
-    yargs.option('project-roots', {
-      alias: 'P',
-      type: 'string',
-      array: true,
+  builder: yargs => {
+    yargs.option("project-roots", {
+      alias: "P",
+      type: "string",
+      array: true
     });
-
-    yargs.option('host', {alias: 'h', type: 'string', default: 'localhost'});
-    yargs.option('port', {alias: 'p', type: 'number', default: 8080});
-
-    yargs.option('max-workers', {alias: 'j', type: 'number'});
-
-    yargs.option('secure', {type: 'boolean', describe: '(deprecated)'});
-    yargs.option('secure-key', {type: 'string', describe: '(deprecated)'});
-    yargs.option('secure-cert', {type: 'string', describe: '(deprecated)'});
-    yargs.option('secure-server-options', {
-      alias: 's',
-      type: 'string',
-      describe: 'Use dot notation for object path',
+    yargs.option("host", {
+      alias: "h",
+      type: "string",
+      default: "localhost"
     });
+    yargs.option("port", {
+      alias: "p",
+      type: "number",
+      default: 8080
+    });
+    yargs.option("max-workers", {
+      alias: "j",
+      type: "number"
+    });
+    yargs.option("secure", {
+      type: "boolean",
+      describe: "(deprecated)"
+    });
+    yargs.option("secure-key", {
+      type: "string",
+      describe: "(deprecated)"
+    });
+    yargs.option("secure-cert", {
+      type: "string",
+      describe: "(deprecated)"
+    });
+    yargs.option("secure-server-options", {
+      alias: "s",
+      type: "string",
+      describe: "Use dot notation for object path"
+    });
+    yargs.option("hmr-enabled", {
+      alias: "hmr",
+      type: "boolean"
+    });
+    yargs.option("config", {
+      alias: "c",
+      type: "string"
+    }); // Deprecated
 
-    yargs.option('hmr-enabled', {alias: 'hmr', type: 'boolean'});
+    yargs.option("reset-cache", {
+      type: "boolean"
+    }); // Examples
 
-    yargs.option('config', {alias: 'c', type: 'string'});
-
-    // Deprecated
-    yargs.option('reset-cache', {type: 'boolean'});
-
-    // Examples
     yargs.example(
-      'secure-server-options',
-      '-s.cert="$(cat path/to/cert)" -s.key="$(cat path/to/key")',
+      "secure-server-options",
+      '-s.cert="$(cat path/to/cert)" -s.key="$(cat path/to/key")'
     );
   },
-
-  handler: makeAsyncCommand(async (argv: YargArguments) => {
+  handler: makeAsyncCommand(async argv => {
     let server = null;
     let restarting = false;
 
-    async function restart(): Promise<void> {
+    async function restart() {
       if (restarting) {
         return;
       } else {
@@ -80,16 +89,14 @@ module.exports = (): ({|
 
       if (server) {
         // eslint-disable-next-line no-console
-        console.log('Configuration changed. Restarting the server...');
-        // $FlowFixMe[method-unbinding] added when improving typing for this parameters
+        console.log("Configuration changed. Restarting the server..."); // $FlowFixMe[method-unbinding] added when improving typing for this parameters
+
         await promisify(server.close).call(server);
       }
 
-      const config = await loadConfig(argv);
+      const config = await loadConfig(argv); // $FlowExpectedError YargArguments and RunBuildOptions are used interchangeable but their types are not yet compatible
 
-      // $FlowExpectedError YargArguments and RunBuildOptions are used interchangeable but their types are not yet compatible
-      server = await MetroApi.runServer(config, (argv: RunServerOptions));
-
+      server = await MetroApi.runServer(config, argv);
       restarting = false;
     }
 
@@ -100,5 +107,5 @@ module.exports = (): ({|
     } else {
       await restart();
     }
-  }),
+  })
 });

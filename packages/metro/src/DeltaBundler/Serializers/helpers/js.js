@@ -4,31 +4,21 @@
  * This source code is licensed under the MIT license found in the
  * LICENSE file in the root directory of this source tree.
  *
- * @flow
+ *
  * @format
  */
+"use strict";
 
-'use strict';
+const invariant = require("invariant");
 
-const invariant = require('invariant');
-const path = require('path');
+const path = require("path");
 
-const {addParamsToDefineCall} = require('metro-transform-plugins');
+const { addParamsToDefineCall } = require("metro-transform-plugins");
 
-import type {MixedOutput, Module} from '../../types.flow';
-import type {JsOutput} from 'metro-transform-worker';
-
-export type Options = {
-  +createModuleId: string => number | string,
-  +dev: boolean,
-  +projectRoot: string,
-  ...
-};
-
-function wrapModule(module: Module<>, options: Options): string {
+function wrapModule(module, options) {
   const output = getJsOutput(module);
 
-  if (output.type.startsWith('js/script')) {
+  if (output.type.startsWith("js/script")) {
     return output.data.code;
   }
 
@@ -36,8 +26,8 @@ function wrapModule(module: Module<>, options: Options): string {
   const params = [
     moduleId,
     Array.from(module.dependencies.values()).map(dependency =>
-      options.createModuleId(dependency.absolutePath),
-    ),
+      options.createModuleId(dependency.absolutePath)
+    )
   ];
 
   if (options.dev) {
@@ -49,44 +39,40 @@ function wrapModule(module: Module<>, options: Options): string {
   return addParamsToDefineCall(output.data.code, ...params);
 }
 
-function getJsOutput(
-  module: $ReadOnly<{
-    output: $ReadOnlyArray<MixedOutput>,
-    path?: string,
-    ...
-  }>,
-): JsOutput {
-  const jsModules = module.output.filter(({type}) => type.startsWith('js/'));
+function getJsOutput(module) {
+  var _module$path, _module$path2;
 
+  const jsModules = module.output.filter(({ type }) => type.startsWith("js/"));
   invariant(
     jsModules.length === 1,
-    `Modules must have exactly one JS output, but ${module.path ??
-      'unknown module'} has ${jsModules.length} JS outputs.`,
+    `Modules must have exactly one JS output, but ${
+      (_module$path = module.path) !== null && _module$path !== void 0
+        ? _module$path
+        : "unknown module"
+    } has ${jsModules.length} JS outputs.`
   );
-
-  const jsOutput: JsOutput = (jsModules[0]: any);
-
+  const jsOutput = jsModules[0];
   invariant(
     Number.isFinite(jsOutput.data.lineCount),
-    `JS output must populate lineCount, but ${module.path ??
-      'unknown module'} has ${jsOutput.type} output with lineCount '${
-      jsOutput.data.lineCount
-    }'`,
+    `JS output must populate lineCount, but ${
+      (_module$path2 = module.path) !== null && _module$path2 !== void 0
+        ? _module$path2
+        : "unknown module"
+    } has ${jsOutput.type} output with lineCount '${jsOutput.data.lineCount}'`
   );
-
   return jsOutput;
 }
 
-function isJsModule(module: Module<>): boolean {
+function isJsModule(module) {
   return module.output.filter(isJsOutput).length > 0;
 }
 
-function isJsOutput(output: MixedOutput): boolean %checks {
-  return output.type.startsWith('js/');
+function isJsOutput(output) {
+  return output.type.startsWith("js/");
 }
 
 module.exports = {
   getJsOutput,
   isJsModule,
-  wrapModule,
+  wrapModule
 };

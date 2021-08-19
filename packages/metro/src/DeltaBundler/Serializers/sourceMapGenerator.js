@@ -4,33 +4,21 @@
  * This source code is licensed under the MIT license found in the
  * LICENSE file in the root directory of this source tree.
  *
- * @flow strict-local
+ *
  * @format
  */
+"use strict";
 
-'use strict';
+const getSourceMapInfo = require("./helpers/getSourceMapInfo");
 
-const getSourceMapInfo = require('./helpers/getSourceMapInfo');
+const { isJsModule } = require("./helpers/js");
 
-const {isJsModule} = require('./helpers/js');
 const {
   fromRawMappings,
-  fromRawMappingsNonBlocking,
-} = require('metro-source-map');
+  fromRawMappingsNonBlocking
+} = require("metro-source-map");
 
-import type {Module} from '../types.flow';
-
-type ReturnType<F> = $Call<<A, R>((...A) => R) => R, F>;
-
-function getSourceMapInfosImpl(
-  isBlocking: boolean,
-  onDone: ($ReadOnlyArray<ReturnType<typeof getSourceMapInfo>>) => void,
-  modules: $ReadOnlyArray<Module<>>,
-  options: {|
-    +excludeSource: boolean,
-    +processModuleFilter: (module: Module<>) => boolean,
-  |},
-): void {
+function getSourceMapInfosImpl(isBlocking, onDone, modules, options) {
   const sourceMapInfos = [];
   const modulesToProcess = modules
     .filter(isJsModule)
@@ -43,7 +31,7 @@ function getSourceMapInfosImpl(
 
     const mod = modulesToProcess.shift();
     const info = getSourceMapInfo(mod, {
-      excludeSource: options.excludeSource,
+      excludeSource: options.excludeSource
     });
     sourceMapInfos.push(info);
     return false;
@@ -51,17 +39,21 @@ function getSourceMapInfosImpl(
 
   function workLoop() {
     const time = process.hrtime();
+
     while (true) {
       const isDone = processNextModule();
+
       if (isDone) {
         onDone(sourceMapInfos);
         break;
       }
+
       if (!isBlocking) {
         // Keep the loop running but try to avoid blocking
         // for too long because this is not in a worker yet.
         const diff = process.hrtime(time);
         const NS_IN_MS = 1000000;
+
         if (diff[1] > 50 * NS_IN_MS) {
           // We've blocked for more than 50ms.
           // This code currently runs on the main thread,
@@ -72,16 +64,11 @@ function getSourceMapInfosImpl(
       }
     }
   }
+
   workLoop();
 }
 
-function sourceMapGenerator(
-  modules: $ReadOnlyArray<Module<>>,
-  options: {|
-    +excludeSource: boolean,
-    +processModuleFilter: (module: Module<>) => boolean,
-  |},
-): ReturnType<typeof fromRawMappings> {
+function sourceMapGenerator(modules, options) {
   let sourceMapInfos;
   getSourceMapInfosImpl(
     true,
@@ -89,23 +76,19 @@ function sourceMapGenerator(
       sourceMapInfos = infos;
     },
     modules,
-    options,
+    options
   );
+
   if (sourceMapInfos == null) {
     throw new Error(
-      'Expected getSourceMapInfosImpl() to finish synchronously.',
+      "Expected getSourceMapInfosImpl() to finish synchronously."
     );
   }
+
   return fromRawMappings(sourceMapInfos);
 }
 
-async function sourceMapGeneratorNonBlocking(
-  modules: $ReadOnlyArray<Module<>>,
-  options: {|
-    +excludeSource: boolean,
-    +processModuleFilter: (module: Module<>) => boolean,
-  |},
-): ReturnType<typeof fromRawMappingsNonBlocking> {
+async function sourceMapGeneratorNonBlocking(modules, options) {
   const sourceMapInfos = await new Promise(resolve => {
     getSourceMapInfosImpl(false, resolve, modules, options);
   });
@@ -114,5 +97,5 @@ async function sourceMapGeneratorNonBlocking(
 
 module.exports = {
   sourceMapGenerator,
-  sourceMapGeneratorNonBlocking,
+  sourceMapGeneratorNonBlocking
 };

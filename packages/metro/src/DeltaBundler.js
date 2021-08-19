@@ -4,35 +4,12 @@
  * This source code is licensed under the MIT license found in the
  * LICENSE file in the root directory of this source tree.
  *
- * @flow strict-local
+ *
  * @format
  */
+"use strict";
 
-'use strict';
-
-const DeltaCalculator = require('./DeltaBundler/DeltaCalculator');
-
-import type Bundler from './Bundler';
-import type {
-  DeltaResult,
-  Graph,
-  Dependencies,
-  // eslint-disable-next-line no-unused-vars
-  MixedOutput,
-  Options,
-} from './DeltaBundler/types.flow';
-
-export type {
-  DeltaResult,
-  Graph,
-  Dependencies,
-  MixedOutput,
-  Module,
-  TransformFn,
-  TransformResult,
-  TransformResultDependency,
-  TransformResultWithSource,
-} from './DeltaBundler/types.flow';
+const DeltaCalculator = require("./DeltaBundler/DeltaCalculator");
 
 /**
  * `DeltaBundler` uses the `DeltaTransformer` to build bundle deltas. This
@@ -40,93 +17,78 @@ export type {
  * concurrent clients requesting their own deltas. This is done through the
  * `clientId` param (which maps a client to a specific delta transformer).
  */
-class DeltaBundler<T = MixedOutput> {
-  _bundler: Bundler;
-  _deltaCalculators: Map<Graph<T>, DeltaCalculator<T>> = new Map();
+class DeltaBundler {
+  _deltaCalculators = new Map();
 
-  constructor(bundler: Bundler) {
+  constructor(bundler) {
     this._bundler = bundler;
   }
 
-  end(): void {
-    this._deltaCalculators.forEach((deltaCalculator: DeltaCalculator<T>) =>
-      deltaCalculator.end(),
-    );
+  end() {
+    this._deltaCalculators.forEach(deltaCalculator => deltaCalculator.end());
+
     this._deltaCalculators = new Map();
   }
 
-  async getDependencies(
-    entryPoints: $ReadOnlyArray<string>,
-    options: Options<T>,
-  ): Promise<Dependencies<T>> {
+  async getDependencies(entryPoints, options) {
     const depGraph = await this._bundler.getDependencyGraph();
-
     const deltaCalculator = new DeltaCalculator(entryPoints, depGraph, options);
-
-    await deltaCalculator.getDelta({reset: true, shallow: options.shallow});
+    await deltaCalculator.getDelta({
+      reset: true,
+      shallow: options.shallow
+    });
     const graph = deltaCalculator.getGraph();
-
     deltaCalculator.end();
     return graph.dependencies;
-  }
-
-  // Note: the graph returned by this function needs to be ended when finished
+  } // Note: the graph returned by this function needs to be ended when finished
   // so that we don't leak graphs that are not reachable.
   // To get just the dependencies, use getDependencies which will not leak graphs.
-  async buildGraph(
-    entryPoints: $ReadOnlyArray<string>,
-    options: Options<T>,
-  ): Promise<Graph<T>> {
+
+  async buildGraph(entryPoints, options) {
     const depGraph = await this._bundler.getDependencyGraph();
-
     const deltaCalculator = new DeltaCalculator(entryPoints, depGraph, options);
-
-    await deltaCalculator.getDelta({reset: true, shallow: options.shallow});
+    await deltaCalculator.getDelta({
+      reset: true,
+      shallow: options.shallow
+    });
     const graph = deltaCalculator.getGraph();
 
     this._deltaCalculators.set(graph, deltaCalculator);
+
     return graph;
   }
 
-  async getDelta(
-    graph: Graph<T>,
-    {
-      reset,
-      shallow,
-    }: {
-      reset: boolean,
-      shallow: boolean,
-      ...
-    },
-  ): Promise<DeltaResult<T>> {
+  async getDelta(graph, { reset, shallow }) {
     const deltaCalculator = this._deltaCalculators.get(graph);
 
     if (!deltaCalculator) {
-      throw new Error('Graph not found');
+      throw new Error("Graph not found");
     }
 
-    return await deltaCalculator.getDelta({reset, shallow});
+    return await deltaCalculator.getDelta({
+      reset,
+      shallow
+    });
   }
 
-  listen(graph: Graph<T>, callback: () => mixed): () => void {
+  listen(graph, callback) {
     const deltaCalculator = this._deltaCalculators.get(graph);
 
     if (!deltaCalculator) {
-      throw new Error('Graph not found');
+      throw new Error("Graph not found");
     }
 
-    deltaCalculator.on('change', callback);
-
+    deltaCalculator.on("change", callback);
     return () => {
-      deltaCalculator.removeListener('change', callback);
+      deltaCalculator.removeListener("change", callback);
     };
   }
 
-  endGraph(graph: Graph<T>): void {
+  endGraph(graph) {
     const deltaCalculator = this._deltaCalculators.get(graph);
 
     if (!deltaCalculator) {
-      throw new Error('Graph not found');
+      throw new Error("Graph not found");
     }
 
     deltaCalculator.end();

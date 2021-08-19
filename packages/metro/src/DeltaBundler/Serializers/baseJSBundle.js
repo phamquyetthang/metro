@@ -4,29 +4,16 @@
  * This source code is licensed under the MIT license found in the
  * LICENSE file in the root directory of this source tree.
  *
- * @flow
+ *
  * @format
  */
+"use strict";
 
-'use strict';
+const getAppendScripts = require("../../lib/getAppendScripts");
 
-const getAppendScripts = require('../../lib/getAppendScripts');
-const processModules = require('./helpers/processModules');
+const processModules = require("./helpers/processModules");
 
-import type {
-  Graph,
-  MixedOutput,
-  Module,
-  SerializerOptions,
-} from '../types.flow';
-import type {Bundle} from 'metro-runtime/src/modules/types.flow';
-
-function baseJSBundle(
-  entryPoint: string,
-  preModules: $ReadOnlyArray<Module<>>,
-  graph: Graph<>,
-  options: SerializerOptions,
-): Bundle {
+function baseJSBundle(entryPoint, preModules, graph, options) {
   for (const module of graph.dependencies.values()) {
     options.createModuleId(module.path);
   }
@@ -35,23 +22,19 @@ function baseJSBundle(
     filter: options.processModuleFilter,
     createModuleId: options.createModuleId,
     dev: options.dev,
-    projectRoot: options.projectRoot,
-  };
+    projectRoot: options.projectRoot
+  }; // Do not prepend polyfills or the require runtime when only modules are requested
 
-  // Do not prepend polyfills or the require runtime when only modules are requested
   if (options.modulesOnly) {
     preModules = [];
   }
 
   const preCode = processModules(preModules, processModulesOptions)
     .map(([_, code]) => code)
-    .join('\n');
-
+    .join("\n");
   const modules = [...graph.dependencies.values()].sort(
-    (a: Module<MixedOutput>, b: Module<MixedOutput>) =>
-      options.createModuleId(a.path) - options.createModuleId(b.path),
+    (a, b) => options.createModuleId(a.path) - options.createModuleId(b.path)
   );
-
   const postCode = processModules(
     getAppendScripts(
       entryPoint,
@@ -66,21 +49,20 @@ function baseJSBundle(
         runBeforeMainModule: options.runBeforeMainModule,
         runModule: options.runModule,
         sourceMapUrl: options.sourceMapUrl,
-        sourceUrl: options.sourceUrl,
-      },
+        sourceUrl: options.sourceUrl
+      }
     ),
-    processModulesOptions,
+    processModulesOptions
   )
     .map(([_, code]) => code)
-    .join('\n');
-
+    .join("\n");
   return {
     pre: preCode,
     post: postCode,
     modules: processModules(
       [...graph.dependencies.values()],
-      processModulesOptions,
-    ).map(([module, code]) => [options.createModuleId(module.path), code]),
+      processModulesOptions
+    ).map(([module, code]) => [options.createModuleId(module.path), code])
   };
 }
 

@@ -4,24 +4,25 @@
  * This source code is licensed under the MIT license found in the
  * LICENSE file in the root directory of this source tree.
  *
- * @flow strict-local
+ *
  * @format
  */
+"use strict";
 
-'use strict';
+const nullthrows = require("nullthrows");
 
-const nullthrows = require('nullthrows');
-const parseCustomTransformOptions = require('./parseCustomTransformOptions');
-const parsePlatformFilePath = require('../node-haste/lib/parsePlatformFilePath');
-const path = require('path');
-const url = require('url');
+const parseCustomTransformOptions = require("./parseCustomTransformOptions");
 
-import type {BundleOptions} from '../shared/types.flow';
+const parsePlatformFilePath = require("../node-haste/lib/parsePlatformFilePath");
+
+const path = require("path");
+
+const url = require("url");
 
 const getBoolean = (query, opt, defaultValue) =>
   query[opt] == null
     ? defaultValue
-    : query[opt] === 'true' || query[opt] === '1';
+    : query[opt] === "true" || query[opt] === "1";
 
 const getNumber = (query, opt, defaultValue) => {
   const number = parseInt(query[opt], 10);
@@ -29,48 +30,48 @@ const getNumber = (query, opt, defaultValue) => {
 };
 
 const getBundleType = bundleType =>
-  bundleType === 'map' ? bundleType : 'bundle';
+  bundleType === "map" ? bundleType : "bundle";
 
 const getTransformProfile = transformProfile =>
-  transformProfile === 'hermes-stable' || transformProfile === 'hermes-canary'
+  transformProfile === "hermes-stable" || transformProfile === "hermes-canary"
     ? transformProfile
-    : 'default';
+    : "default";
 
 module.exports = function parseOptionsFromUrl(
-  requestUrl: string,
-  platforms: Set<string>,
-  bytecodeVersion: number,
-): BundleOptions {
+  requestUrl,
+  platforms,
+  bytecodeVersion
+) {
   const parsedURL = nullthrows(url.parse(requestUrl, true)); // `true` to parse the query param as an object.
+
   const query = nullthrows(parsedURL.query);
   const pathname =
     query.bundleEntry ||
-    (parsedURL.pathname != null ? decodeURIComponent(parsedURL.pathname) : '');
+    (parsedURL.pathname != null ? decodeURIComponent(parsedURL.pathname) : "");
   const platform =
     query.platform || parsePlatformFilePath(pathname, platforms).platform;
   const bundleType = getBundleType(path.extname(pathname).substr(1));
   const runtimeBytecodeVersion = getNumber(
     query,
-    'runtimeBytecodeVersion',
-    null,
+    "runtimeBytecodeVersion",
+    null
   );
-
   return {
     bundleType,
     runtimeBytecodeVersion:
       bytecodeVersion === runtimeBytecodeVersion ? bytecodeVersion : null,
     customTransformOptions: parseCustomTransformOptions(parsedURL),
-    dev: getBoolean(query, 'dev', true),
-    entryFile: pathname.replace(/^(?:\.?\/)?/, './').replace(/\.[^/.]+$/, ''),
-    excludeSource: getBoolean(query, 'excludeSource', false),
+    dev: getBoolean(query, "dev", true),
+    entryFile: pathname.replace(/^(?:\.?\/)?/, "./").replace(/\.[^/.]+$/, ""),
+    excludeSource: getBoolean(query, "excludeSource", false),
     hot: true,
-    inlineSourceMap: getBoolean(query, 'inlineSourceMap', false),
-    minify: getBoolean(query, 'minify', false),
-    modulesOnly: getBoolean(query, 'modulesOnly', false),
+    inlineSourceMap: getBoolean(query, "inlineSourceMap", false),
+    minify: getBoolean(query, "minify", false),
+    modulesOnly: getBoolean(query, "modulesOnly", false),
     onProgress: null,
     platform,
-    runModule: getBoolean(query, 'runModule', true),
-    shallow: getBoolean(query, 'shallow', false),
+    runModule: getBoolean(query, "runModule", true),
+    shallow: getBoolean(query, "shallow", false),
     sourceMapUrl: url.format({
       ...parsedURL,
       // The Chrome Debugger loads bundles via Blob urls, whose
@@ -78,12 +79,12 @@ module.exports = function parseOptionsFromUrl(
       // protocol-relative URLs, which is why we must force the HTTP protocol
       // when loading the bundle for either Android or iOS.
       protocol:
-        platform != null && platform.match(/^(android|ios)$/) ? 'http' : '',
-      pathname: pathname.replace(/\.(bundle|delta)$/, '.map'),
+        platform != null && platform.match(/^(android|ios)$/) ? "http" : "",
+      pathname: pathname.replace(/\.(bundle|delta)$/, ".map")
     }),
     sourceUrl: requestUrl,
     unstable_transformProfile: getTransformProfile(
-      query.unstable_transformProfile,
-    ),
+      query.unstable_transformProfile
+    )
   };
 };

@@ -4,30 +4,18 @@
  * This source code is licensed under the MIT license found in the
  * LICENSE file in the root directory of this source tree.
  *
- * @flow strict-local
+ *
  * @format
  */
+"use strict";
 
-'use strict';
+const { getAssetFiles } = require("../../Assets");
 
-const {getAssetFiles} = require('../../Assets');
-const {getJsOutput, isJsModule} = require('./helpers/js');
+const { getJsOutput, isJsModule } = require("./helpers/js");
 
-import type {Graph, Module} from '../types.flow';
-
-type Options = {|
-  platform: ?string,
-  +processModuleFilter: (module: Module<>) => boolean,
-|};
-
-async function getAllFiles(
-  pre: $ReadOnlyArray<Module<>>,
-  graph: Graph<>,
-  options: Options,
-): Promise<$ReadOnlyArray<string>> {
+async function getAllFiles(pre, graph, options) {
   const modules = graph.dependencies;
-  const {processModuleFilter} = options;
-
+  const { processModuleFilter } = options;
   const promises = [];
 
   for (const module of pre) {
@@ -41,7 +29,7 @@ async function getAllFiles(
       continue;
     }
 
-    if (getJsOutput(module).type === 'js/module/asset') {
+    if (getJsOutput(module).type === "js/module/asset") {
       promises.push(getAssetFiles(module.path, options.platform));
     } else {
       promises.push([module.path]);

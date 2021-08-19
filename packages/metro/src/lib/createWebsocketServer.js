@@ -1,32 +1,20 @@
+"use strict";
+
+var _ws = _interopRequireDefault(require("ws"));
+
+function _interopRequireDefault(obj) {
+  return obj && obj.__esModule ? obj : { default: obj };
+}
+
 /**
  * Copyright (c) Facebook, Inc. and its affiliates.
  *
  * This source code is licensed under the MIT license found in the
  * LICENSE file in the root directory of this source tree.
  *
- * @flow
+ *
  * @format
  */
-
-import ws from 'ws';
-type WebsocketServiceInterface<T> = interface {
-  +onClientConnect: (
-    url: string,
-    sendFn: (data: string) => void,
-  ) => Promise<?T>,
-  +onClientDisconnect?: (client: T) => mixed,
-  +onClientError?: (client: T, e: ErrorEvent) => mixed,
-  +onClientMessage?: (
-    client: T,
-    message: string,
-    sendFn: (data: string) => void,
-  ) => mixed,
-};
-
-type HMROptions<TClient> = {
-  websocketServer: WebsocketServiceInterface<TClient>,
-  ...
-};
 
 /**
  * Returns a WebSocketServer to be attached to an existing HTTP instance. It forwards
@@ -38,15 +26,11 @@ type HMROptions<TClient> = {
  *   - onClientMessage
  *   - onClientDisconnect
  */
-
-module.exports = function createWebsocketServer<TClient: Object>({
-  websocketServer,
-}: HMROptions<TClient>): typeof ws.Server {
-  const wss = new ws.Server({
-    noServer: true,
+module.exports = function createWebsocketServer({ websocketServer }) {
+  const wss = new _ws.default.Server({
+    noServer: true
   });
-
-  wss.on('connection', async (ws, req) => {
+  wss.on("connection", async (ws, req) => {
     let connected = true;
     const url = req.url;
 
@@ -63,17 +47,15 @@ module.exports = function createWebsocketServer<TClient: Object>({
       return;
     }
 
-    ws.on('error', e => {
+    ws.on("error", e => {
       websocketServer.onClientError && websocketServer.onClientError(client, e);
     });
-
-    ws.on('close', () => {
+    ws.on("close", () => {
       websocketServer.onClientDisconnect &&
         websocketServer.onClientDisconnect(client);
       connected = false;
     });
-
-    ws.on('message', message => {
+    ws.on("message", message => {
       websocketServer.onClientMessage &&
         websocketServer.onClientMessage(client, message, sendFn);
     });

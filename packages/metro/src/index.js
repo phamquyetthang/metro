@@ -4,219 +4,145 @@
  * This source code is licensed under the MIT license found in the
  * LICENSE file in the root directory of this source tree.
  *
- * @flow
+ *
  * @format
  */
+"use strict";
 
-'use strict';
+const IncrementalBundler = require("./IncrementalBundler");
 
-const IncrementalBundler = require('./IncrementalBundler');
-const MetroHmrServer = require('./HmrServer');
-const MetroServer = require('./Server');
+const MetroHmrServer = require("./HmrServer");
 
-const chalk = require('chalk');
-const createWebsocketServer = require('./lib/createWebsocketServer');
-const fs = require('fs');
-const http = require('http');
-const https = require('https');
-const makeBuildCommand = require('./commands/build');
-const makeDependenciesCommand = require('./commands/dependencies');
-const makeServeCommand = require('./commands/serve');
-const outputBundle = require('./shared/output/bundle');
-const ws = require('ws');
+const MetroServer = require("./Server");
 
-const {loadConfig, mergeConfig, getDefaultConfig} = require('metro-config');
-const {InspectorProxy} = require('metro-inspector-proxy');
-const {parse} = require('url');
+const chalk = require("chalk");
 
-import type {Graph} from './DeltaBundler';
-import type {ServerOptions} from './Server';
-import type {RequestOptions, OutputOptions} from './shared/types.flow.js';
-import type {Server as HttpServer} from 'http';
-import type {Server as HttpsServer} from 'https';
-import type {
-  ConfigT,
-  InputConfigT,
-  Middleware,
-} from 'metro-config/src/configTypes.flow';
-import type {CustomTransformOptions} from 'metro-transform-worker';
-import typeof Yargs from 'yargs';
+const createWebsocketServer = require("./lib/createWebsocketServer");
 
-type MetroMiddleWare = {|
-  attachHmrServer: (httpServer: HttpServer | HttpsServer) => void,
-  end: () => void,
-  metroServer: MetroServer,
-  middleware: Middleware,
-|};
+const fs = require("fs");
 
-export type RunServerOptions = {|
-  hasReducedPerformance?: boolean,
-  host?: string,
-  onError?: (Error & {|code?: string|}) => void,
-  onReady?: (server: HttpServer | HttpsServer) => void,
-  runInspectorProxy?: boolean,
-  secureServerOptions?: Object,
-  secure?: boolean, // deprecated
-  secureCert?: string, // deprecated
-  secureKey?: string, // deprecated
-  websocketEndpoints?: {
-    [path: string]: typeof ws.Server,
-  },
-|};
+const http = require("http");
 
-type BuildGraphOptions = {|
-  entries: $ReadOnlyArray<string>,
-  customTransformOptions?: CustomTransformOptions,
-  dev?: boolean,
-  minify?: boolean,
-  onProgress?: (transformedFileCount: number, totalFileCount: number) => void,
-  platform?: string,
-  type?: 'module' | 'script',
-|};
+const https = require("https");
 
-export type RunBuildOptions = {|
-  entry: string,
-  dev?: boolean,
-  out?: string,
-  onBegin?: () => void,
-  onComplete?: () => void,
-  onProgress?: (transformedFileCount: number, totalFileCount: number) => void,
-  minify?: boolean,
-  output?: {
-    build: (
-      MetroServer,
-      RequestOptions,
-    ) => Promise<{
-      code: string,
-      map: string,
-      ...
-    }>,
-    save: (
-      {
-        code: string,
-        map: string,
-        ...
-      },
-      OutputOptions,
-      (...args: Array<string>) => void,
-    ) => Promise<mixed>,
-    ...
-  },
-  platform?: string,
-  sourceMap?: boolean,
-  sourceMapUrl?: string,
-|};
+const makeBuildCommand = require("./commands/build");
 
-type BuildCommandOptions = {||} | null;
-type ServeCommandOptions = {||} | null;
+const makeDependenciesCommand = require("./commands/dependencies");
 
-async function getConfig(config: InputConfigT): Promise<ConfigT> {
+const makeServeCommand = require("./commands/serve");
+
+const outputBundle = require("./shared/output/bundle");
+
+const ws = require("ws");
+
+const { loadConfig, mergeConfig, getDefaultConfig } = require("metro-config");
+
+const { InspectorProxy } = require("metro-inspector-proxy");
+
+const { parse } = require("url");
+
+async function getConfig(config) {
   const defaultConfig = await getDefaultConfig(config.projectRoot);
   return mergeConfig(defaultConfig, config);
 }
 
-async function runMetro(
-  config: InputConfigT,
-  options?: ServerOptions,
-): Promise<MetroServer> {
+async function runMetro(config, options) {
   const mergedConfig = await getConfig(config);
-
   mergedConfig.reporter.update({
     hasReducedPerformance: options
       ? Boolean(options.hasReducedPerformance)
       : false,
     port: mergedConfig.server.port,
-    type: 'initialize_started',
+    type: "initialize_started"
   });
-
   return new MetroServer(mergedConfig, options);
 }
 
 exports.runMetro = runMetro;
 exports.loadConfig = loadConfig;
 
-exports.createConnectMiddleware = async function(
-  config: ConfigT,
-  options?: ServerOptions,
-): Promise<MetroMiddleWare> {
+exports.createConnectMiddleware = async function(config, options) {
   const metroServer = await runMetro(config, options);
+  let enhancedMiddleware = metroServer.processRequest; // Enhance the resulting middleware using the config options
 
-  let enhancedMiddleware = metroServer.processRequest;
-
-  // Enhance the resulting middleware using the config options
   if (config.server.enhanceMiddleware) {
     enhancedMiddleware = config.server.enhanceMiddleware(
       enhancedMiddleware,
-      metroServer,
+      metroServer
     );
   }
 
   return {
-    attachHmrServer(httpServer: HttpServer | HttpsServer): void {
+    attachHmrServer(httpServer) {
       const wss = createWebsocketServer({
         websocketServer: new MetroHmrServer(
           metroServer.getBundler(),
           metroServer.getCreateModuleId(),
-          config,
-        ),
+          config
+        )
       });
-      httpServer.on('upgrade', (request, socket, head) => {
-        const {pathname} = parse(request.url);
-        if (pathname === '/hot') {
+      httpServer.on("upgrade", (request, socket, head) => {
+        const { pathname } = parse(request.url);
+
+        if (pathname === "/hot") {
           wss.handleUpgrade(request, socket, head, ws => {
-            wss.emit('connection', ws, request);
+            wss.emit("connection", ws, request);
           });
         } else {
           socket.destroy();
         }
       });
     },
+
     metroServer,
     middleware: enhancedMiddleware,
-    end(): void {
+
+    end() {
       metroServer.end();
-    },
+    }
   };
 };
 
 exports.runServer = async (
-  config: ConfigT,
+  config,
   {
     hasReducedPerformance = false,
     host,
     onError,
     onReady,
     secureServerOptions,
-    secure, //deprecated
-    secureCert, // deprecated
-    secureKey, // deprecated
-    websocketEndpoints = {},
-  }: RunServerOptions,
-): Promise<HttpServer | HttpsServer> => {
+    secure,
+    //deprecated
+    secureCert,
+    // deprecated
+    secureKey,
+    // deprecated
+    websocketEndpoints = {}
+  }
+) => {
   if (secure != null || secureCert != null || secureKey != null) {
     // eslint-disable-next-line no-console
     console.warn(
-      chalk.inverse.yellow.bold(' DEPRECATED '),
-      'The `secure`, `secureCert`, and `secureKey` options are now deprecated. ' +
-        'Please use the `secureServerOptions` object instead to pass options to ' +
-        "Metro's https development server.",
+      chalk.inverse.yellow.bold(" DEPRECATED "),
+      "The `secure`, `secureCert`, and `secureKey` options are now deprecated. " +
+        "Please use the `secureServerOptions` object instead to pass options to " +
+        "Metro's https development server."
     );
-  }
-  // Lazy require
-  const connect = require('connect');
+  } // Lazy require
+
+  const connect = require("connect");
 
   const serverApp = connect();
-
-  const {middleware, end, metroServer} = await exports.createConnectMiddleware(
-    config,
-    {
-      hasReducedPerformance,
-    },
-  );
-
+  const {
+    middleware,
+    end,
+    metroServer
+  } = await exports.createConnectMiddleware(config, {
+    hasReducedPerformance
+  });
   serverApp.use(middleware);
+  let inspectorProxy = null;
 
-  let inspectorProxy: ?InspectorProxy = null;
   if (config.server.runInspectorProxy) {
     inspectorProxy = new InspectorProxy(config.projectRoot);
   }
@@ -225,96 +151,90 @@ exports.runServer = async (
 
   if (secure || secureServerOptions != null) {
     let options = secureServerOptions;
-    if (typeof secureKey === 'string' && typeof secureCert === 'string') {
+
+    if (typeof secureKey === "string" && typeof secureCert === "string") {
       options = Object.assign(
         {
           key: fs.readFileSync(secureKey),
-          cert: fs.readFileSync(secureCert),
+          cert: fs.readFileSync(secureCert)
         },
-        secureServerOptions,
+        secureServerOptions
       );
     }
+
     httpServer = https.createServer(options, serverApp);
   } else {
     httpServer = http.createServer(serverApp);
   }
 
-  httpServer.on('error', error => {
+  httpServer.on("error", error => {
     if (onError) {
       onError(error);
     }
+
     end();
   });
+  return new Promise((resolve, reject) => {
+    httpServer.listen(config.server.port, host, () => {
+      if (onReady) {
+        onReady(httpServer);
+      }
 
-  return new Promise(
-    (
-      resolve: (result: HttpServer | HttpsServer) => void,
-      reject: mixed => mixed,
-    ) => {
-      httpServer.listen(config.server.port, host, () => {
-        if (onReady) {
-          onReady(httpServer);
+      Object.assign(websocketEndpoints, {
+        ...(inspectorProxy
+          ? { ...inspectorProxy.createWebSocketListeners(httpServer) }
+          : {}),
+        "/hot": createWebsocketServer({
+          websocketServer: new MetroHmrServer(
+            metroServer.getBundler(),
+            metroServer.getCreateModuleId(),
+            config
+          )
+        })
+      });
+      httpServer.on("upgrade", (request, socket, head) => {
+        const { pathname } = parse(request.url);
+
+        if (pathname != null && websocketEndpoints[pathname]) {
+          websocketEndpoints[pathname].handleUpgrade(
+            request,
+            socket,
+            head,
+            ws => {
+              websocketEndpoints[pathname].emit("connection", ws, request);
+            }
+          );
+        } else {
+          socket.destroy();
         }
-
-        Object.assign(websocketEndpoints, {
-          ...(inspectorProxy
-            ? {...inspectorProxy.createWebSocketListeners(httpServer)}
-            : {}),
-          '/hot': createWebsocketServer({
-            websocketServer: new MetroHmrServer(
-              metroServer.getBundler(),
-              metroServer.getCreateModuleId(),
-              config,
-            ),
-          }),
-        });
-
-        httpServer.on('upgrade', (request, socket, head) => {
-          const {pathname} = parse(request.url);
-          if (pathname != null && websocketEndpoints[pathname]) {
-            websocketEndpoints[pathname].handleUpgrade(
-              request,
-              socket,
-              head,
-              ws => {
-                websocketEndpoints[pathname].emit('connection', ws, request);
-              },
-            );
-          } else {
-            socket.destroy();
-          }
-        });
-
-        if (inspectorProxy) {
-          // TODO(hypuk): Refactor inspectorProxy.processRequest into separate request handlers
-          // so that we could provide routes (/json/list and /json/version) here.
-          // Currently this causes Metro to give warning about T31407894.
-          // $FlowFixMe[method-unbinding] added when improving typing for this parameters
-          serverApp.use(inspectorProxy.processRequest.bind(inspectorProxy));
-        }
-
-        resolve(httpServer);
       });
 
-      // Disable any kind of automatic timeout behavior for incoming
-      // requests in case it takes the packager more than the default
-      // timeout of 120 seconds to respond to a request.
-      httpServer.timeout = 0;
+      if (inspectorProxy) {
+        // TODO(hypuk): Refactor inspectorProxy.processRequest into separate request handlers
+        // so that we could provide routes (/json/list and /json/version) here.
+        // Currently this causes Metro to give warning about T31407894.
+        // $FlowFixMe[method-unbinding] added when improving typing for this parameters
+        serverApp.use(inspectorProxy.processRequest.bind(inspectorProxy));
+      }
 
-      httpServer.on('error', error => {
-        end();
-        reject(error);
-      });
+      resolve(httpServer);
+    }); // Disable any kind of automatic timeout behavior for incoming
+    // requests in case it takes the packager more than the default
+    // timeout of 120 seconds to respond to a request.
 
-      httpServer.on('close', () => {
-        end();
-      });
-    },
-  );
+    httpServer.timeout = 0;
+    httpServer.on("error", error => {
+      end();
+      reject(error);
+    });
+    httpServer.on("close", () => {
+      end();
+    });
+  });
 };
 
 exports.runBuild = async (
-  config: ConfigT,
+  config,
   {
     dev = false,
     entry,
@@ -324,21 +244,17 @@ exports.runBuild = async (
     minify = true,
     output = outputBundle,
     out,
-    platform = 'web',
+    platform = "web",
     sourceMap = false,
-    sourceMapUrl,
-  }: RunBuildOptions,
-): Promise<{
-  code: string,
-  map: string,
-  ...
-}> => {
+    sourceMapUrl
+  }
+) => {
   const metroServer = await runMetro(config, {
-    watch: false,
+    watch: false
   });
 
   try {
-    const requestOptions: RequestOptions = {
+    const requestOptions = {
       dev,
       entryFile: entry,
       inlineSourceMap: sourceMap && !sourceMapUrl,
@@ -346,7 +262,7 @@ exports.runBuild = async (
       platform,
       sourceMapUrl: sourceMap === false ? undefined : sourceMapUrl,
       createModuleIdFactory: config.serializer.createModuleIdFactory,
-      onProgress,
+      onProgress
     };
 
     if (onBegin) {
@@ -360,18 +276,16 @@ exports.runBuild = async (
     }
 
     if (out) {
-      const bundleOutput = out.replace(/(\.js)?$/, '.js');
+      const bundleOutput = out.replace(/(\.js)?$/, ".js");
       const sourcemapOutput =
-        sourceMap === false ? undefined : out.replace(/(\.js)?$/, '.map');
-
-      const outputOptions: OutputOptions = {
+        sourceMap === false ? undefined : out.replace(/(\.js)?$/, ".map");
+      const outputOptions = {
         bundleOutput,
         sourcemapOutput,
         dev,
-        platform,
-      };
+        platform
+      }; // eslint-disable-next-line no-console
 
-      // eslint-disable-next-line no-console
       await output.save(metroBundle, outputOptions, console.log);
     }
 
@@ -382,19 +296,18 @@ exports.runBuild = async (
 };
 
 exports.buildGraph = async function(
-  config: InputConfigT,
+  config,
   {
     customTransformOptions = Object.create(null),
     dev = false,
     entries,
     minify = false,
     onProgress,
-    platform = 'web',
-    type = 'module',
-  }: BuildGraphOptions,
-): Promise<Graph<>> {
+    platform = "web",
+    type = "module"
+  }
+) {
   const mergedConfig = await getConfig(config);
-
   const bundler = new IncrementalBundler(mergedConfig);
 
   try {
@@ -404,7 +317,7 @@ exports.buildGraph = async function(
       dev,
       minify,
       platform,
-      type,
+      type
     });
   } finally {
     bundler.end();
@@ -413,30 +326,28 @@ exports.buildGraph = async function(
 
 exports.attachMetroCli = function(
   // $FlowFixMe[value-as-type]
-  yargs: Yargs,
-  {
-    build = {},
-    serve = {},
-    dependencies = {},
-  }: {
-    build: BuildCommandOptions,
-    serve: ServeCommandOptions,
-    dependencies: any,
-    ...
-  } = {},
-  // $FlowFixMe[value-as-type]
-): Yargs {
+  yargs,
+  { build = {}, serve = {}, dependencies = {} } = {}
+) {
   if (build) {
-    const {command, description, builder, handler} = makeBuildCommand();
+    const { command, description, builder, handler } = makeBuildCommand();
     yargs.command(command, description, builder, handler);
   }
+
   if (serve) {
-    const {command, description, builder, handler} = makeServeCommand();
+    const { command, description, builder, handler } = makeServeCommand();
     yargs.command(command, description, builder, handler);
   }
+
   if (dependencies) {
-    const {command, description, builder, handler} = makeDependenciesCommand();
+    const {
+      command,
+      description,
+      builder,
+      handler
+    } = makeDependenciesCommand();
     yargs.command(command, description, builder, handler);
   }
+
   return yargs;
 };

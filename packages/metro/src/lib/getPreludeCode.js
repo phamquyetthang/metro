@@ -4,36 +4,27 @@
  * This source code is licensed under the MIT license found in the
  * LICENSE file in the root directory of this source tree.
  *
- * @flow strict
+ *
  * @format
  */
+"use strict";
 
-'use strict';
-
-function getPreludeCode({
-  extraVars,
-  isDev,
-  globalPrefix,
-}: {|
-  +extraVars?: {[string]: mixed, ...},
-  +isDev: boolean,
-  +globalPrefix: string,
-|}): string {
+function getPreludeCode({ extraVars, isDev, globalPrefix }) {
   const vars = [
-    '__BUNDLE_START_TIME__=this.nativePerformanceNow?nativePerformanceNow():Date.now()',
+    "__BUNDLE_START_TIME__=this.nativePerformanceNow?nativePerformanceNow():Date.now()",
     `__DEV__=${String(isDev)}`,
     ...formatExtraVars(extraVars),
-    'process=this.process||{}',
-    `__METRO_GLOBAL_PREFIX__='${globalPrefix}'`,
+    "process=this.process||{}",
+    `__METRO_GLOBAL_PREFIX__='${globalPrefix}'`
   ];
-  return `var ${vars.join(',')};${processEnv(
-    isDev ? 'development' : 'production',
+  return `var ${vars.join(",")};${processEnv(
+    isDev ? "development" : "production"
   )}`;
 }
 
-const excluded = new Set(['__BUNDLE_START_TIME__', '__DEV__', 'process']);
+const excluded = new Set(["__BUNDLE_START_TIME__", "__DEV__", "process"]);
 
-function formatExtraVars(extraVars: ?{[string]: mixed, ...}): Array<string> {
+function formatExtraVars(extraVars) {
   const assignments = [];
 
   for (const key in extraVars) {
@@ -48,9 +39,9 @@ function formatExtraVars(extraVars: ?{[string]: mixed, ...}): Array<string> {
   return assignments;
 }
 
-function processEnv(nodeEnv: string): string {
+function processEnv(nodeEnv) {
   return `process.env=process.env||{};process.env.NODE_ENV=process.env.NODE_ENV||${JSON.stringify(
-    nodeEnv,
+    nodeEnv
   )};`;
 }
 
